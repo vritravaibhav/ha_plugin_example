@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Hardware-Accelerated Drawing Plugin — Vendor Brief</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  * { box-sizing: border-box; }
+  html, body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1a1a1a; font-size: 11pt; line-height: 1.45; }
+  body { margin: 0; }
+  h1 { font-size: 22pt; margin: 0 0 4pt 0; color: #0b3d91; }
+  h2 { font-size: 14pt; margin: 18pt 0 6pt 0; padding-bottom: 3pt; border-bottom: 1.5pt solid #0b3d91; color: #0b3d91; }
+  h3 { font-size: 12pt; margin: 12pt 0 4pt 0; color: #222; }
+  p, li { font-size: 11pt; }
+  ul, ol { margin: 4pt 0 8pt 18pt; padding: 0; }
+  li { margin-bottom: 3pt; }
+  code, pre { font-family: "SF Mono", "Menlo", Consolas, monospace; font-size: 9.5pt; }
+  pre { background: #f4f6fa; border: 1pt solid #d8dde6; border-radius: 4pt; padding: 8pt; white-space: pre-wrap; word-wrap: break-word; page-break-inside: avoid; }
+  code.inline { background: #f1f3f7; padding: 1pt 4pt; border-radius: 3pt; }
+  table { width: 100%; border-collapse: collapse; margin: 6pt 0 10pt 0; font-size: 10pt; page-break-inside: avoid; }
+  th, td { border: 1pt solid #cdd3dc; padding: 5pt 7pt; text-align: left; vertical-align: top; }
+  th { background: #eef2f8; }
+  .meta { font-size: 9.5pt; color: #555; margin-bottom: 14pt; }
+  .callout { background: #fff4e0; border-left: 3pt solid #e08a00; padding: 8pt 10pt; border-radius: 3pt; margin: 8pt 0; page-break-inside: avoid; }
+  .must { background: #ffe6e6; border-left: 3pt solid #c62828; padding: 8pt 10pt; border-radius: 3pt; margin: 8pt 0; page-break-inside: avoid; }
+  .check { background: #e8f5e9; border-left: 3pt solid #2e7d32; padding: 8pt 10pt; border-radius: 3pt; margin: 8pt 0; page-break-inside: avoid; }
+  .pageBreak { page-break-before: always; }
+  .footer { font-size: 9pt; color: #666; border-top: 1pt solid #cdd3dc; padding-top: 6pt; margin-top: 18pt; }
+  .kv td:first-child { width: 32%; font-weight: 600; background: #f7f9fc; }
+</style>
+</head>
+<body>
+
+<h1>Hardware-Accelerated Drawing Plugin — Vendor Brief</h1>
+<div class="meta">
+  Reference repository: <code class="inline">https://github.com/vritravaibhav/ha_plugin_example</code><br/>
+  Reference plugin: <code class="inline">plugins/deltav100</code> (Nomivision Delta V100 motherboard)<br/>
+  Document version: 1.0 &middot; Date: 22 May 2026
+</div>
+
+<h2>1. Objective</h2>
+<p>
+We need a Flutter plugin that drives <b>your hardware-accelerated drawing panel</b> (your motherboard / SDK) and exposes
+<b>exactly the same Flutter-side API</b> as our existing <code class="inline">deltav100</code> plugin. Our host
+application uses a single widget — <code class="inline">HardwareAcceleratedCanvas</code> — to drive the canvas.
+That widget, its constructor parameters, callbacks, view-type identifier, and channel names must remain identical so the
+host app can switch panels by only swapping the plugin dependency. The native (Android) implementation is yours; the
+Flutter contract is fixed.
+</p>
+
+<h2>2. Deliverables</h2>
+<table class="kv">
+  <tr><td>1. Source code</td><td>A public or shared <b>GitHub repository</b>, <b>forked from</b>
+      <code class="inline">https://github.com/vritravaibhav/ha_plugin_example</code>, containing your plugin under
+      <code class="inline">plugins/&lt;your_plugin_name&gt;/</code>.</td></tr>
+  <tr><td>2. Working APK</td><td>A signed debug or release <b>APK</b> built from that fork that runs on your target
+      hardware and demonstrates the canvas working end-to-end.</td></tr>
+  <tr><td>3. Build instructions</td><td>A short <code class="inline">README.md</code> in the plugin folder with build
+      steps, target Android API level, any required system services, and licensing notes for any proprietary
+      SDK / .so libraries you bundle.</td></tr>
+</table>
+
+<div class="must"><b>Mandatory:</b> the APK code <u>must be a fork of our repository</u>. Do not start from a
+fresh Flutter project. We need git history that shows the diff between your plugin and our reference plugin.</div>
+
+<h2>3. Flutter-side contract (do NOT change)</h2>
+
+<h3>3.1 Widget — <code class="inline">HardwareAcceleratedCanvas</code></h3>
+<p>This is the only widget the host app instantiates. Class name, parameter names, types, and order must match exactly.</p>
+
+<pre>class HardwareAcceleratedCanvas extends StatefulWidget {
+  const HardwareAcceleratedCanvas({
+    super.key,
+    required this.penColor,
+    required this.isRainbow,
+    required this.isDashed,
+    required this.strokeWidth,
+    required this.isHighlight,
+    required this.isMultiFingerEnabled,
+    this.onStrokeStarted,
+    this.onStrokeCommitted,
+    this.gestureRecognizers,
+  });
+
+  final Color penColor;
+  final bool isRainbow;
+  final bool isDashed;
+  final double strokeWidth;
+  final bool isHighlight;
+  final bool isMultiFingerEnabled;
+  final VoidCallback? onStrokeStarted;
+  final Deltav100StrokeCallback? onStrokeCommitted; // signature below
+  final Set&lt;Factory&lt;OneSequenceGestureRecognizer&gt;&gt;? gestureRecognizers;
+}
+
+typedef Deltav100StrokeCallback = void Function(Map&lt;String, dynamic&gt; data);</pre>
+
+<div class="callout">You may rename the typedef (e.g. <code class="inline">YourPanelStrokeCallback</code>) but the
+<b>function signature must stay</b> <code class="inline">void Function(Map&lt;String, dynamic&gt; data)</code> and
+the widget property must remain <code class="inline">onStrokeCommitted</code>.</div>
+
+<h3>3.2 Parameter semantics</h3>
+<table>
+  <tr><th>Parameter</th><th>Type</th><th>Meaning</th></tr>
+  <tr><td><code class="inline">penColor</code></td><td>Color</td><td>Current pen colour (ARGB int passed to native).</td></tr>
+  <tr><td><code class="inline">isRainbow</code></td><td>bool</td><td>Rainbow gradient stroke shader.</td></tr>
+  <tr><td><code class="inline">isDashed</code></td><td>bool</td><td>Dashed stroke pattern.</td></tr>
+  <tr><td><code class="inline">strokeWidth</code></td><td>double</td><td>Pen width in logical pixels.</td></tr>
+  <tr><td><code class="inline">isHighlight</code></td><td>bool</td><td>Translucent highlighter mode.</td></tr>
+  <tr><td><code class="inline">isMultiFingerEnabled</code></td><td>bool</td><td>Allow simultaneous multi-touch strokes.</td></tr>
+  <tr><td><code class="inline">onStrokeStarted</code></td><td>VoidCallback?</td><td>Fires once when the first pointer goes down.</td></tr>
+  <tr><td><code class="inline">onStrokeCommitted</code></td><td>callback</td><td>Fires on pointer up with the full stroke payload (see 3.4).</td></tr>
+  <tr><td><code class="inline">gestureRecognizers</code></td><td>set</td><td>Passed through to the native <code class="inline">AndroidView</code>.</td></tr>
+</table>
+
+<h3>3.3 Platform-view &amp; channel identifiers (must match)</h3>
+<table>
+  <tr><th>Constant</th><th>Required value</th></tr>
+  <tr><td>Android view type</td><td><code class="inline">fb_drawing_view_deltav100</code></td></tr>
+  <tr><td>Stroke event channel</td><td><code class="inline">com.demopaint.draw_app/hardware_stroke</code></td></tr>
+  <tr><td>Framebuffer method channel</td><td><code class="inline">com.demopaint.draw_app/framebuffer</code></td></tr>
+</table>
+<p>If you absolutely must rename your view type internally, you may — but the Flutter package must continue to register
+the platform view under <code class="inline">fb_drawing_view_deltav100</code> so the host app code is unchanged.</p>
+
+<h3>3.4 <code class="inline">onStrokeCommitted</code> payload schema</h3>
+<p>The <code class="inline">Map&lt;String, dynamic&gt;</code> delivered to <code class="inline">onStrokeCommitted</code>
+on every stroke <b>must</b> contain these keys with these types (matches what
+<code class="inline">Deltav100StrokeBridge.java</code> emits today):</p>
+<pre>{
+  "points":      List&lt;Map&gt;,   // each item: { "x": double, "y": double } in view-space px
+  "color":       int,            // ARGB
+  "strokeWidth": double,         // logical px
+  "dashed":      bool,
+  "rainbow":     bool,
+  "viewWidth":   double,         // native view width  (px)
+  "viewHeight":  double,         // native view height (px)
+  "pointer":     int             // Android pointerId
+}</pre>
+
+<p>Additionally, your event stream must emit these two control messages exactly as the reference does:</p>
+<pre>{ "strokeStarted":   true }   // when first finger goes down
+{ "requestBrushSync": true }  // when native surface (re)creates and needs brush state</pre>
+
+<h3>3.5 MethodChannel surface (must match)</h3>
+<p>The framebuffer method channel must accept these methods with these argument shapes:</p>
+<table>
+  <tr><th>Method</th><th>Arguments</th></tr>
+  <tr><td><code class="inline">setDrawColor</code></td><td><code class="inline">{ color: int /* ARGB */ }</code></td></tr>
+  <tr><td><code class="inline">setEraserMode</code></td><td><code class="inline">{ enable: bool }</code></td></tr>
+  <tr><td><code class="inline">setStrokeSize</code></td><td><code class="inline">{ size: double }</code></td></tr>
+  <tr><td><code class="inline">setEraserSize</code></td><td><code class="inline">{ size: double }</code></td></tr>
+  <tr><td><code class="inline">setDashedStroke</code></td><td><code class="inline">{ enable: bool }</code></td></tr>
+  <tr><td><code class="inline">setRainbowMode</code></td><td><code class="inline">{ enable: bool }</code></td></tr>
+  <tr><td><code class="inline">setHighlightMode</code></td><td><code class="inline">{ enable: bool }</code></td></tr>
+  <tr><td><code class="inline">clearNativeCanvas</code></td><td>—</td></tr>
+</table>
+
+<h3>3.6 Host-app usage that must compile unchanged</h3>
+<p>After dropping in your plugin (only the <code class="inline">pubspec.yaml</code> dependency path changes), this
+example app file must build and run without edits:</p>
+<pre>import 'package:&lt;your_plugin&gt;/&lt;your_plugin&gt;.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+
+HardwareAcceleratedCanvas(
+  penColor: Colors.black,
+  isRainbow: false,
+  isDashed: false,
+  strokeWidth: 20,
+  isHighlight: false,
+  isMultiFingerEnabled: true,
+  onStrokeStarted: () { /* ... */ },
+  onStrokeCommitted: (data) { /* ... */ },
+  gestureRecognizers: &lt;Factory&lt;OneSequenceGestureRecognizer&gt;&gt;{
+    Factory&lt;OneSequenceGestureRecognizer&gt;(() =&gt; EagerGestureRecognizer()),
+  },
+)</pre>
+
+<div class="pageBreak"></div>
+
+<h2>4. Native side — what we expect (informational only)</h2>
+<p>You are <b>free to use your own native SDK / framebuffer driver / motherboard APIs</b>. We do not require you
+to copy our Nomivision <code class="inline">WhiteBoardSpeedup</code> integration. The only constraints on the
+native side are the channel + view-type identifiers in §3.3 and the payload schema in §3.4.</p>
+<p>For reference, our existing Android implementation is split into:</p>
+<ul>
+  <li><code class="inline">Deltav100Plugin.java</code> — channel + factory registration</li>
+  <li><code class="inline">Deltav100FbDrawingViewFactory.java</code> — <code class="inline">PlatformViewFactory</code></li>
+  <li><code class="inline">Deltav100FbDrawingView.java</code> — <code class="inline">SurfaceView</code> that draws into the FB</li>
+  <li><code class="inline">Deltav100HardwareAccel.java</code> — vendor SDK wrapper</li>
+  <li><code class="inline">Deltav100StrokeBridge.java</code> — emits stroke events to Flutter</li>
+  <li><code class="inline">Deltav100Config.java</code> — screen dimensions</li>
+</ul>
+<p>You may mirror this layout or use any structure you prefer.</p>
+
+<h2>5. Functional acceptance criteria</h2>
+<div class="check">
+<ol>
+  <li>The example app (<code class="inline">lib/main.dart</code> in the fork) builds and installs on your target
+      device with no edits beyond the plugin <code class="inline">path:</code> in <code class="inline">pubspec.yaml</code>.</li>
+  <li>Touching the screen draws strokes with hardware acceleration (no Flutter-level rasterisation).</li>
+  <li>Stroke width, colour, dashed, rainbow, highlight, and eraser modes all visibly work and respond to
+      <code class="inline">MethodChannel</code> calls from Flutter.</li>
+  <li>Multi-finger drawing works when <code class="inline">isMultiFingerEnabled = true</code>.</li>
+  <li><code class="inline">onStrokeStarted</code> fires on first pointer down.</li>
+  <li><code class="inline">onStrokeCommitted</code> fires on pointer up with the payload schema in §3.4.</li>
+  <li>The native FB is wiped within ~300 ms after pointer-up so the Flutter side can take over rendering
+      seamlessly (or document your equivalent handoff behaviour).</li>
+  <li><code class="inline">clearNativeCanvas</code> clears the panel.</li>
+</ol>
+</div>
+
+<h2>6. Handover checklist</h2>
+<ul>
+  <li>GitHub URL of the fork (public, or invite our account as collaborator).</li>
+  <li>APK file (debug or signed release) built from the latest commit on that fork.</li>
+  <li>Commit SHA the APK was built from.</li>
+  <li>Target panel / motherboard model + Android version verified on.</li>
+  <li>Any AAR / SO / proprietary dependencies and their licenses.</li>
+  <li>One short demo video (15-30 s) showing the example app running on the panel.</li>
+</ul>
+
+<h2>7. Out of scope</h2>
+<ul>
+  <li>iOS / desktop builds (the widget returns <code class="inline">SizedBox.shrink()</code> off-Android — keep that).</li>
+  <li>UI of the host app — we own <code class="inline">lib/main.dart</code>; do not redesign it.</li>
+  <li>Persistent storage, networking, account systems.</li>
+</ul>
+
+<h2>8. Contact</h2>
+<p>For any clarifications about the Flutter contract, open an issue on the source repository
+(<code class="inline">https://github.com/vritravaibhav/ha_plugin_example</code>) or reply to the email this brief was attached to.</p>
+
+<div class="footer">
+  Hardware-Accelerated Drawing Plugin — Vendor Brief &middot; v1.0 &middot; 22 May 2026<br/>
+  Reference: <code class="inline">plugins/deltav100</code> in <code class="inline">vritravaibhav/ha_plugin_example</code>
+</div>
+
+</body>
+</html>
